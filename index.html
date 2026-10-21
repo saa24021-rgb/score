@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Click & Tap Highscore Challenge</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Font for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(236, 72, 153, 0.5), 0 0 30px rgba(139, 92, 246, 0.3); }
+            50% { box-shadow: 0 0 25px rgba(236, 72, 153, 0.8), 0 0 50px rgba(139, 92, 246, 0.6); }
+        }
+        .animate-glow {
+            animation: pulse-glow 2s infinite;
+        }
+        .tap-effect {
+            animation: tap-scale 0.1s ease-out;
+        }
+        @keyframes tap-scale {
+            0% { transform: scale(0.95); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .particle {
+            position: absolute;
+            pointer-events: none;
+            animation: float-up 0.6s ease-out forwards;
+        }
+        @keyframes float-up {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -100px) scale(1.5); }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen font-sans flex flex-col justify-between selection:bg-pink-500 selection:text-white">
+
+    <header class="p-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-20">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-gamepad text-2xl text-pink-500"></i>
+                <h1 class="text-xl font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">
+                    Click Rush Online
+                </h1>
+            </div>
+            <div id="authStatus" class="text-xs bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-full flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" id="statusDot"></span>
+                <span id="statusText" class="text-slate-300">Firebase接続中...</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto w-full p-4 flex-grow grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <section class="md:col-span-2 flex flex-col items-center justify-between bg-slate-900/50 border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-2xl">
+            
+            <!-- Game Top Info Bar -->
+            <div class="w-full flex justify-between items-center mb-4">
+                <div class="bg-slate-800/80 border border-slate-700 px-4 py-2 rounded-xl text-center">
+                    <span class="text-xs text-slate-400 block uppercase tracking-wider">TIME</span>
+                    <span id="timerDisplay" class="text-2xl font-black font-mono text-cyan-400">10.0</span>s
+                </div>
+                <div class="bg-slate-800/80 border border-slate-700 px-4 py-2 rounded-xl text-center">
+                    <span class="text-xs text-slate-400 block uppercase tracking-wider">SCORE</span>
+                    <span id="scoreDisplay" class="text-2xl font-black font-mono text-pink-500">0</span>
+                </div>
+                <div class="bg-slate-800/80 border border-slate-700 px-4 py-2 rounded-xl text-center">
+                    <span class="text-xs text-slate-400 block uppercase tracking-wider">CPS</span>
+                    <span id="cpsDisplay" class="text-2xl font-black font-mono text-purple-400">0.0</span>
+                </div>
+            </div>
+
+            <!-- Time Progress Bar -->
+            <div class="w-full bg-slate-800 h-2 rounded-full mb-6 overflow-hidden">
+                <div id="progressBar" class="bg-gradient-to-r from-pink-500 to-cyan-400 h-full w-full transition-all duration-100 ease-linear"></div>
+            </div>
+
+            <div class="relative my-auto py-6 w-full flex justify-center items-center">
+                <button id="clickBtn" disabled 
+                    class="w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-br from-pink-600 via-purple-600 to-indigo-700 text-white font-black text-2xl shadow-2xl flex flex-col justify-center items-center transition duration-100 border-4 border-pink-400/30 cursor-not-allowed opacity-50 select-none touch-manipulation active:scale-95">
+                    <i class="fa-solid fa-hand-pointer text-4xl mb-2 animate-bounce" id="btnIcon"></i>
+                    <span id="btnText">スタートを押してね</span>
+                </button>
+            </div>
+
+            <div class="w-full flex gap-3 mt-4">
+                <button id="startBtn" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-play"></i> ゲームスタート
+                </button>
+                <button id="resetBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3.5 px-4 rounded-xl border border-slate-700 transition active:scale-95">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+
+        </section>
+
+        <section class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-2xl">
+            <div>
+                <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+                    <h2 class="text-lg font-bold flex items-center gap-2 text-yellow-400">
+                        <i class="fa-solid fa-trophy"></i> ハイスコアランキング
+                    </h2>
+                    <span class="text-xs text-slate-500">リアルタイム</span>
+                </div>
+
+                <!-- Player Name Input Field -->
+                <div class="mb-4">
+                    <label class="block text-xs text-slate-400 mb-1">プレイヤー名 (ランキング登録用)</label>
+                    <input type="text" id="playerNameInput" maxlength="12" placeholder="ゲストプレイヤー"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-pink-500 transition">
+                </div>
+
+                <div id="leaderboardList" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    <div class="text-center py-8 text-slate-500 text-sm">
+                        <i class="fa-solid fa-spinner animate-spin text-xl mb-2"></i>
+                        <p>ランキング取得中...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-800 text-center">
+                <p class="text-xs text-slate-500">最高記録を目指してクリック！</p>
+            </div>
+        </section>
+
+    </main>
+
+    <div id="resultModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl transform scale-95 transition-transform duration-300" id="modalContent">
+            <div class="w-16 h-16 bg-pink-500/20 text-pink-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl border border-pink-500/40">
+                <i class="fa-solid fa-flag-checkered"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-white mb-1">タイムアップ！</h3>
+            <p class="text-xs text-slate-400 mb-4">10秒間のスコア結果</p>
+
+            <div class="bg-slate-800/50 rounded-xl p-4 mb-6 border border-slate-700/50 space-y-2">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400">タップ回数:</span>
+                    <span id="finalScore" class="text-2xl font-black text-pink-500">0</span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400">平均秒速 (CPS):</span>
+                    <span id="finalCps" class="text-lg font-bold text-purple-400">0.0</span>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <button id="saveScoreBtn" class="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> スコアを送信する
+                </button>
+                <button id="closeModalBtn" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 px-4 rounded-xl transition">
+                    もう一度挑戦する
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="p-4 border-t border-slate-800 text-center text-xs text-slate-600">
+        Web Development Final Project | Powered by Firebase & JavaScript
+    </footer>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            signInWithCustomToken,
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            onSnapshot, 
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Setup Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyACezqGuRJjUbD7tKqtbzfAvwLKNhHpE7o",
+            authDomain: "score-67539.firebaseapp.com",
+            projectId: "score-67539",
+            storageBucket: "score-67539.firebasestorage.app",
+            messagingSenderId: "564319717934",
+            appId: "1:564319717934:web:a9031c90fbc831a55eedbf"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // App Identifiers & Collections (Following system path rules)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'click-game-default';
+        const scoresCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'highscores');
+
+        // State Variables
+        let currentUser = null;
+        let score = 0;
+        let timeLeft = 10.0;
+        let gameTimer = null;
+        let isPlaying = false;
+        const GAME_DURATION = 10.0;
+
+        // DOM Element References
+        const timerDisplay = document.getElementById('timerDisplay');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const cpsDisplay = document.getElementById('cpsDisplay');
+        const progressBar = document.getElementById('progressBar');
+        const clickBtn = document.getElementById('clickBtn');
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const btnText = document.getElementById('btnText');
+        const btnIcon = document.getElementById('btnIcon');
+        const playerNameInput = document.getElementById('playerNameInput');
+        const leaderboardList = document.getElementById('leaderboardList');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+
+        // Modal Elements
+        const resultModal = document.getElementById('resultModal');
+        const modalContent = document.getElementById('modalContent');
+        const finalScore = document.getElementById('finalScore');
+        const finalCps = document.getElementById('finalCps');
+        const saveScoreBtn = document.getElementById('saveScoreBtn');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Auth error, attempting anonymous fallback:", err);
+                try {
+                    await signInAnonymously(auth);
+                } catch (e) {
+                    console.error("Anonymous auth failed:", e);
+                    statusText.textContent = "認証エラー";
+                    statusDot.className = "w-2 h-2 rounded-full bg-red-500";
+                }
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                statusText.textContent = "オンライン";
+                statusDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                listenToLeaderboard();
+            } else {
+                statusText.textContent = "未接続";
+                statusDot.className = "w-2 h-2 rounded-full bg-amber-500";
+            }
+        });
+
+        initAuth();
+
+        function listenToLeaderboard() {
+            // Strict Rule: Simple collection query without compound orderBy to avoid missing index errors
+            onSnapshot(scoresCollectionRef, (snapshot) => {
+                const scoresList = [];
+                snapshot.forEach((doc) => {
+                    scoresList.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Client-side Sorting & Filtering
+                scoresList.sort((a, b) => (b.score || 0) - (a.score || 0));
+                const topScores = scoresList.slice(0, 10);
+
+                renderLeaderboard(topScores);
+            }, (error) => {
+                console.error("Leaderboard fetch failed:", error);
+                leaderboardList.innerHTML = `<div class="text-center py-4 text-red-400 text-xs">データの読み込みに失敗しました</div>`;
+            });
+        }
+
+        // Render Leaderboard UI
+        function renderLeaderboard(scores) {
+            if (scores.length === 0) {
+                leaderboardList.innerHTML = `<div class="text-center py-8 text-slate-500 text-sm">記録がまだありません</div>`;
+                return;
+            }
+
+            leaderboardList.innerHTML = scores.map((item, index) => {
+                let badgeClass = "bg-slate-800 text-slate-400";
+                let rankIcon = index + 1;
+
+                if (index === 0) {
+                    badgeClass = "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40";
+                    rankIcon = `<i class="fa-solid fa-crown text-yellow-400"></i>`;
+                } else if (index === 1) {
+                    badgeClass = "bg-slate-300/20 text-slate-300 border border-slate-300/40";
+                } else if (index === 2) {
+                    badgeClass = "bg-amber-600/20 text-amber-500 border border-amber-600/40";
+                }
+
+                return `
+                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/40 border border-slate-800/80 hover:border-slate-700 transition">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${badgeClass}">
+                                ${rankIcon}
+                            </div>
+                            <span class="font-medium text-sm text-slate-200 truncate max-w-[110px]">
+                                ${escapeHtml(item.name || 'ゲスト')}
+                            </span>
+                        </div>
+                        <div class="text-right">
+                            <span class="font-mono font-bold text-pink-400 text-sm">${item.score}</span>
+                            <span class="text-[10px] text-slate-500 block">回</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Helper to prevent XSS
+        function escapeHtml(str) {
+            return str.replace(/[&<>"']/g, (m) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[m]));
+        }
+
+        function startGame() {
+            if (isPlaying) return;
+
+            isPlaying = true;
+            score = 0;
+            timeLeft = GAME_DURATION;
+
+            // UI Reset
+            scoreDisplay.textContent = '0';
+            timerDisplay.textContent = GAME_DURATION.toFixed(1);
+            cpsDisplay.textContent = '0.0';
+            progressBar.style.width = '100%';
+
+            // Button Activation
+            clickBtn.disabled = false;
+            clickBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            clickBtn.classList.add('animate-glow', 'cursor-pointer');
+            btnText.textContent = '連打！！';
+            btnIcon.className = 'fa-solid fa-bolt text-4xl mb-2 animate-bounce';
+
+            startBtn.disabled = true;
+            startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            // Timer Tick
+            const startTime = Date.now();
+            gameTimer = setInterval(() => {
+                const elapsed = (Date.now() - startTime) / 1000;
+                timeLeft = Math.max(0, GAME_DURATION - elapsed);
+
+                timerDisplay.textContent = timeLeft.toFixed(1);
+                progressBar.style.width = `${(timeLeft / GAME_DURATION) * 100}%`;
+
+                const cps = score > 0 ? (score / (GAME_DURATION - timeLeft)).toFixed(1) : '0.0';
+                cpsDisplay.textContent = isNaN(cps) || !isFinite(cps) ? '0.0' : cps;
+
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 50);
+        }
+
+        function endGame() {
+            clearInterval(gameTimer);
+            isPlaying = false;
+
+            // UI Disable
+            clickBtn.disabled = true;
+            clickBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            clickBtn.classList.remove('animate-glow');
+            btnText.textContent = '終了！';
+            btnIcon.className = 'fa-solid fa-flag-checkered text-4xl mb-2';
+
+            startBtn.disabled = false;
+            startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+            // Calculate final stats
+            const finalCpsVal = (score / GAME_DURATION).toFixed(1);
+
+            // Show Modal Result
+            finalScore.textContent = score;
+            finalCps.textContent = finalCpsVal;
+
+            setTimeout(() => {
+                resultModal.classList.remove('opacity-0', 'pointer-events-none');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            }, 300);
+        }
+
+        function resetGame() {
+            clearInterval(gameTimer);
+            isPlaying = false;
+            score = 0;
+            timeLeft = GAME_DURATION;
+
+            scoreDisplay.textContent = '0';
+            timerDisplay.textContent = GAME_DURATION.toFixed(1);
+            cpsDisplay.textContent = '0.0';
+            progressBar.style.width = '100%';
+
+            clickBtn.disabled = true;
+            clickBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            clickBtn.classList.remove('animate-glow');
+            btnText.textContent = 'スタートを押してね';
+            btnIcon.className = 'fa-solid fa-hand-pointer text-4xl mb-2 animate-bounce';
+
+            startBtn.disabled = false;
+            startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        // Handle Tap / Click Event
+        function handleTap(e) {
+            if (!isPlaying) return;
+
+            score++;
+            scoreDisplay.textContent = score;
+
+            // Visual Tap Feedback
+            clickBtn.classList.remove('tap-effect');
+            void clickBtn.offsetWidth; // Force Reflow
+            clickBtn.classList.add('tap-effect');
+
+            // Floating Score Particle Effect
+            createParticle(e);
+
+            // Device Vibration
+            if (navigator.vibrate) {
+                navigator.vibrate(30);
+            }
+        }
+
+        function createParticle(e) {
+            const rect = clickBtn.getBoundingClientRect();
+            const x = e.clientX ? e.clientX : (rect.left + rect.width / 2);
+            const y = e.clientY ? e.clientY : (rect.top + rect.height / 2);
+
+            const particle = document.createElement('div');
+            particle.className = 'particle text-pink-400 font-black text-xl select-none';
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+            particle.textContent = '+1';
+
+            document.body.appendChild(particle);
+
+            setTimeout(() => {
+                particle.remove();
+            }, 600);
+        }
+
+        async function saveScoreToFirestore() {
+            if (!currentUser) {
+                alert("データベースに接続されていません。再読み込みしてください。");
+                return;
+            }
+
+            const playerName = playerNameInput.value.trim() || 'ゲスト';
+            saveScoreBtn.disabled = true;
+            saveScoreBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> 送信中...`;
+
+            try {
+                // Save document to specified path
+                await addDoc(scoresCollectionRef, {
+                    uid: currentUser.uid,
+                    name: playerName,
+                    score: score,
+                    cps: parseFloat((score / GAME_DURATION).toFixed(1)),
+                    createdAt: serverTimestamp()
+                });
+
+                closeModal();
+            } catch (err) {
+                console.error("Score save error:", err);
+                alert("スコアの保存に失敗しました。もう一度お試しください。");
+            } finally {
+                saveScoreBtn.disabled = false;
+                saveScoreBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> スコアを送信する`;
+            }
+        }
+
+        function closeModal() {
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-95');
+            resultModal.classList.add('opacity-0', 'pointer-events-none');
+            resetGame();
+        }
+
+        startBtn.addEventListener('click', startGame);
+        resetBtn.addEventListener('click', resetGame);
+        clickBtn.addEventListener('pointerdown', handleTap);
+        saveScoreBtn.addEventListener('click', saveScoreToFirestore);
+        closeModalBtn.addEventListener('click', closeModal);
+
+        // Store Player Name locally in memory when input changes
+        playerNameInput.value = localStorage.getItem('click_game_player_name') || '';
+        playerNameInput.addEventListener('input', (e) => {
+            localStorage.setItem('click_game_player_name', e.target.value);
+        });
+    </script>
+</body>
+</html>
