@@ -186,7 +186,9 @@
             GoogleAuthProvider,
             signInWithPopup,
             signOut,
-            onAuthStateChanged 
+            onAuthStateChanged,
+            setPersistence,
+            browserLocalPersistence
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, 
@@ -255,8 +257,13 @@
 
         const initAuth = async () => {
             try {
-                // トークンのプロジェクト不一致エラーを回避するため、まず匿名認証を試行・確立します
-                await signInAnonymously(auth);
+                // ブラウザを再読み込み・閉じてもログイン状態を保持する設定
+                await setPersistence(auth, browserLocalPersistence);
+
+                // 既にログイン中のユーザー(Googleまたは以前のセッション)が存在するか確認
+                if (!auth.currentUser) {
+                    await signInAnonymously(auth);
+                }
             } catch (err) {
                 console.error("Auth initialization failed:", err);
                 statusText.textContent = "認証エラー";
